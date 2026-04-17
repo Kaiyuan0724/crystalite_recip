@@ -20,7 +20,6 @@ class RecipModel(nn.Module):
             self,
             vz: int,
             d_model: int = 256,
-            d_cond:  int = 256,
             d_ffn:   int = 1024,
             n_layers:   int = 6,
             n_heads: int = 8,
@@ -32,21 +31,13 @@ class RecipModel(nn.Module):
             lattice_repr:       str = "y1",
             coord_head_mode:    str = "direct",
             sigma_init:         float = 0.5,
-            y_mean:     Tensor = None,   # (6,) normalization mean of y_target
-            y_std:      Tensor = None,   # (6,) normalization std  of y_target
     ) -> None:
         super().__init__()
         self.n_layers = n_layers
 
         # ── Normalization stats for y (used to denormalize before RoPE) ──
         # Stored as buffers → saved/loaded with checkpoint automatically
-        if y_mean is None:
-            y_mean = torch.zeros(6)
-        if y_std is None:
-            y_std = torch.ones(6)
-        self.register_buffer("y_mean", torch.as_tensor(y_mean, dtype=torch.float32))
-        self.register_buffer("y_std",  torch.as_tensor(y_std,  dtype=torch.float32))
-
+        
         self.type_dim = (vz + 1) if type_dim is None else int(type_dim)
         self.type_proj = nn.Sequential(
             nn.Linear(self.type_dim, d_model, bias=True),
@@ -70,7 +61,6 @@ class RecipModel(nn.Module):
             CrystalDiTBlock(
                 d_model=d_model,
                 n_heads=n_heads,
-                d_cond=d_cond,
                 d_ffn=d_ffn,
                 dropout=dropout,
                 rope=self.rope,
@@ -109,14 +99,16 @@ class RecipModel(nn.Module):
         h_type = self.type_proj(type_feats) + self.segment_embed.weight[0]
         h_lat = self.lattice_embed(lattice_feats) + self.segment_embed.weight[1]
         h_lat = h_lat[:, None, :]
-        
-        y_physical = lattice_feats * self.y_std + self.y_mean         # (B, 6)
 
-        # Bug 7 fixed: lattice token placed FIRST so RoPEAttention skips it via
-        # n_prefix=1, avoiding shape mismatch between sequence (B, N+1, D) and
-        # frac_coords (B, N, 3).
-        # Sequence layout: [lattice_token, atom_0, ..., atom_{N}]
         x = torch.cat([h_lat, h_type], dim=1)  # (B, N+1, D)
+        
+        lat_for_rope = lattice_bias_feats if lattice_bias_feats is not None else lattice_feats
+        lat_for_rope = lat_for_rope.clone()
+
+        # diagnal term of L (index 0, 2, 5)
+        lat_for_rope[:, 0] = lat_for_rope[:, 0].clamp(-10.0, 10.0)
+        lat_for_rope[:, 2] = lat_for_rope[:, 2].clamp(-10.0, 10.0)
+        lat_for_rope[:, 5] = lat_for_rope[:, 5].clamp(-10.0, 10.0)
 
         # Lattice token is never padding; its False goes at the front.
         pad_seq = torch.cat(
@@ -129,23 +121,19 @@ class RecipModel(nn.Module):
 
         t_emb = self.time(t_sigma, t_sigma)
 
-        # Bug 4 fixed: feed h (not the original x) into each successive block
-        # Bug 5 fixed: all positional args, no SyntaxError
         h = x
         for block in self.trunk:
-            h = block(h, t_emb, frac_mod, y_physical, pad_seq, n_prefix=1)
+            h = block(h, t_emb, frac_mod, lat_for_rope, pad_seq, n_prefix=1)
 
-        # Bug 6 fixed: apply norm_out before the output heads
         h = self.norm_out(h)
 
-        # Unpack lattice-first sequence: position 0 = lattice, 1: = atoms
         h_lat_out = h[:, 0, :]   # (B, D)
         h_atoms   = h[:, 1:, :]  # (B, N, D)
 
         # Call head submodules directly (CrystalHeads.forward expects lattice-last,
         # so we slice manually and avoid that assumption here)
-        type_logits = self.heads.type_head(h_atoms)
         lattice_vel = self.heads.lattice_head(h_lat_out)
+        type_logits = self.heads.type_head(h_atoms)
         if self.heads.coord_head_mode == "direct":
             coord_vel = self.heads.coord_head(h_atoms)
         else:

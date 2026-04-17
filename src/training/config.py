@@ -218,7 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--lattice_repr",
         type=str,
-        default="y1",
+        default="ltri",
         choices=["y1", "ltri"],
         help=(
             "Internal lattice latent representation. "

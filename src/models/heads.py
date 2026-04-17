@@ -86,9 +86,9 @@ class CrystalHeads(nn.Module):
         frac_coords: torch.Tensor | None = None,
         pad_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
-        # h: (B, S, d_model) with last token as lattice
-        h_atoms = h[:, :-1, :]
-        h_lat = h[:, -1, :]
+        # h: (B, S, d_model) with first token as lattice
+        h_lat = h[:, 0, :]
+        h_atoms = h[:, 1:, :]
         if self.coord_head_mode == "direct":
             coord_vel = self.coord_head(h_atoms)
         else:

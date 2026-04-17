@@ -22,11 +22,11 @@ class AdaLNModulation(nn.Module):
     d_model : int  Transformer hidden dimension.
     """
 
-    def __init__(self, d_cond: int, d_model: int):
+    def __init__(self, d_model: int):
         super().__init__()
         self.proj = nn.Sequential(
             nn.SiLU(),
-            nn.Linear(d_cond, 6 * d_model),
+            nn.Linear(d_model, 6 * d_model),
         )
         # Zero-init the linear layer so alpha starts at 0
         nn.init.zeros_(self.proj[1].weight)
@@ -36,7 +36,7 @@ class AdaLNModulation(nn.Module):
         """
         Parameters
         ----------
-        C_t : (B, d_cond)
+        C_t : (B, d_model)
 
         Returns
         -------
@@ -181,7 +181,6 @@ class CrystalDiTBlock(nn.Module):
     ----------
     d_model : int               Transformer hidden dim.
     n_heads : int               Number of attention heads.
-    d_cond  : int               Condition vector dim (from ConditionBlock).
     d_ffn   : int               FFN intermediate dim.
     dropout : float             Dropout rate.
     rope    : ReciprocalRoPE    Shared RoPE instance (all blocks share one).
@@ -190,7 +189,7 @@ class CrystalDiTBlock(nn.Module):
     -----
     Input:
         h           (B, N, D)        token sequence
-        C_t         (B, D_cond)      global condition vector
+        C_t         (B, d_model)      global condition vector
         frac_coords (B, N, 3)        fractional coordinates (noisy)
         k_t         (B, 6)           lattice k-parameters (noisy)
         attn_mask   (B, N)           True = masked (padding)
@@ -202,14 +201,13 @@ class CrystalDiTBlock(nn.Module):
         self,
         d_model: int = 256,
         n_heads: int = 8,
-        d_cond:  int = 256,
         d_ffn:   int = 1024,
         dropout: float = 0.1,
         rope:    ReciprocalRoPE = None,
     ):
         super().__init__()
 
-        self.adaln = AdaLNModulation(d_cond, d_model)
+        self.adaln = AdaLNModulation(d_model)
 
         self.norm1 = nn.LayerNorm(d_model, elementwise_affine=False)
         self.attn  = RoPEAttention(d_model, n_heads, dropout, rope)
@@ -220,7 +218,7 @@ class CrystalDiTBlock(nn.Module):
     def forward(
         self,
         h:           Tensor,   # (B, N_total, D)
-        C_t:         Tensor,   # (B, D_cond)
+        C_t:         Tensor,   # (B, d_model)
         frac_coords: Tensor,   # (B, N_atoms, 3)  atom coords only
         k_t:         Tensor,   # (B, 6)
         attn_mask:   Tensor,   # (B, N_total)
