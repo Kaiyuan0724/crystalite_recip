@@ -5,11 +5,6 @@ from torch import Tensor
 
 from .recip_rope_y import ReciprocalRoPE
 
-
-# ════════════════════════════════════════════════════════════════
-#  AdaLN Modulation
-# ════════════════════════════════════════════════════════════════
-
 class AdaLNModulation(nn.Module):
     """
     Generate 6 modulation vectors from the global condition C_t.
@@ -126,12 +121,9 @@ class RoPEAttention(nn.Module):
 
             Q = torch.cat([Q_prefix, Q_atoms], dim=1) if n_prefix > 0 else Q_atoms
             K = torch.cat([K_prefix, K_atoms], dim=1) if n_prefix > 0 else K_atoms
-
-        # ── Reshape to multi-head: (B, n_heads, N_total, d_head) ──
         Q = Q.view(B, N_total, self.n_heads, self.d_head).transpose(1, 2)
         K = K.view(B, N_total, self.n_heads, self.d_head).transpose(1, 2)
         V = V.view(B, N_total, self.n_heads, self.d_head).transpose(1, 2)
-
         # ── Scaled dot-product attention ──
         # attn_mask: (B, N_total) bool → (B, 1, 1, N_total) for broadcasting
         mask_4d = attn_mask.unsqueeze(1).unsqueeze(2)      # (B, 1, 1, N_total)
@@ -142,7 +134,6 @@ class RoPEAttention(nn.Module):
         attn = self.attn_drop(attn)
 
         out = torch.matmul(attn, V)                        # (B, H, N, d_head)
-
         # ── Merge heads and project ──
         out = out.transpose(1, 2).reshape(B, N_total, D)   # (B, N_total, D)
         return self.out_proj(out)                           # (B, N_total, D)
@@ -218,14 +209,11 @@ class CrystalDiTBlock(nn.Module):
     ):
         super().__init__()
 
-        # ── AdaLN modulation: C_t → 6 vectors ──
         self.adaln = AdaLNModulation(d_cond, d_model)
 
-        # ── Attention sub-block ──
         self.norm1 = nn.LayerNorm(d_model, elementwise_affine=False)
         self.attn  = RoPEAttention(d_model, n_heads, dropout, rope)
 
-        # ── FFN sub-block ──
         self.norm2 = nn.LayerNorm(d_model, elementwise_affine=False)
         self.ffn   = FFN(d_model, d_ffn, dropout)
 
