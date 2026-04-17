@@ -32,10 +32,21 @@ class RecipModel(nn.Module):
             lattice_repr:       str = "y1",
             coord_head_mode:    str = "direct",
             sigma_init:         float = 0.5,
+            y_mean:     Tensor = None,   # (6,) normalization mean of y_target
+            y_std:      Tensor = None,   # (6,) normalization std  of y_target
     ) -> None:
         super().__init__()
         self.n_layers = n_layers
-        # Bug 2 fixed: handle type_dim=None (same logic as CrystaliteModel)
+
+        # ── Normalization stats for y (used to denormalize before RoPE) ──
+        # Stored as buffers → saved/loaded with checkpoint automatically
+        if y_mean is None:
+            y_mean = torch.zeros(6)
+        if y_std is None:
+            y_std = torch.ones(6)
+        self.register_buffer("y_mean", torch.as_tensor(y_mean, dtype=torch.float32))
+        self.register_buffer("y_std",  torch.as_tensor(y_std,  dtype=torch.float32))
+
         self.type_dim = (vz + 1) if type_dim is None else int(type_dim)
         self.type_proj = nn.Sequential(
             nn.Linear(self.type_dim, d_model, bias=True),
@@ -94,15 +105,17 @@ class RecipModel(nn.Module):
             lattice_bias_feats: optional (B, 6), unused here but required by EDM interface.
         """
         frac_mod = mod1(frac_coords)
-        # Bug 3 fixed: removed duplicate '+' operator
+
         h_type = self.type_proj(type_feats) + self.segment_embed.weight[0]
         h_lat = self.lattice_embed(lattice_feats) + self.segment_embed.weight[1]
         h_lat = h_lat[:, None, :]
+        
+        y_physical = lattice_feats * self.y_std + self.y_mean         # (B, 6)
 
         # Bug 7 fixed: lattice token placed FIRST so RoPEAttention skips it via
         # n_prefix=1, avoiding shape mismatch between sequence (B, N+1, D) and
         # frac_coords (B, N, 3).
-        # Sequence layout: [lattice_token, atom_0, ..., atom_{N-1}]
+        # Sequence layout: [lattice_token, atom_0, ..., atom_{N}]
         x = torch.cat([h_lat, h_type], dim=1)  # (B, N+1, D)
 
         # Lattice token is never padding; its False goes at the front.
@@ -120,7 +133,7 @@ class RecipModel(nn.Module):
         # Bug 5 fixed: all positional args, no SyntaxError
         h = x
         for block in self.trunk:
-            h = block(h, t_emb, frac_mod, lattice_feats, pad_seq, n_prefix=1)
+            h = block(h, t_emb, frac_mod, y_physical, pad_seq, n_prefix=1)
 
         # Bug 6 fixed: apply norm_out before the output heads
         h = self.norm_out(h)
