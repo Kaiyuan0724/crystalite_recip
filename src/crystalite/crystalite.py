@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from src.models.embeddings import FourierCoordEmbedder, LatticeEmbedder, TimeEmbedder
+from src.models.embeddings import LatticeEmbedder, TimeEmbedder #, FourierCoordEmbedder
 from src.models.transformer import TransformerTrunk
 from src.models.heads import CrystalHeads
 
@@ -31,27 +31,27 @@ class CrystaliteModel(nn.Module):
         n_layers: int,
         vz: int,
         type_dim: int | None = None,
-        n_freqs: int = 32,
-        coord_embed_mode: str = "rff",
-        coord_rff_dim: int | None = None,
-        coord_rff_sigma: float = 1.0,
+        # n_freqs: int = 32,
+        # coord_embed_mode: str = "rff",     # Random Fourier Features
+        # coord_rff_dim: int | None = None,
+        # coord_rff_sigma: float = 1.0,
         lattice_embed_mode: str = "rff",
         lattice_rff_dim: int = 256,
         lattice_rff_sigma: float = 5.0,
         mlp_ratio: float = 4.0,
         dropout: float = 0.0,
         attn_dropout: float = 0.0,
-        use_distance_bias: bool = False,
-        use_edge_bias: bool = False,
-        edge_bias_n_freqs: int = 8,
-        edge_bias_hidden_dim: int = 128,
-        edge_bias_n_rbf: int = 16,
-        edge_bias_rbf_max: float = 2.0,
-        pbc_radius: int = 1,
+        # use_distance_bias: bool = False,
+        # use_edge_bias: bool = False,
+        # edge_bias_n_freqs: int = 8,
+        # edge_bias_hidden_dim: int = 128,
+        # edge_bias_n_rbf: int = 16,
+        # edge_bias_rbf_max: float = 2.0,
+        # pbc_radius: int = 1,
+        # dist_slope_init: float = -1.0,
         lattice_repr: str = "y1",
-        dist_slope_init: float = -1.0,
-        use_noise_gate: bool = True,
-        gem_per_layer: bool = False,
+        # use_noise_gate: bool = True,
+        # gem_per_layer: bool = False,
         coord_head_mode: str = "direct",
     ) -> None:
         super().__init__()
@@ -61,13 +61,13 @@ class CrystaliteModel(nn.Module):
             nn.SiLU(),
             nn.Linear(d_model, d_model, bias=True),
         )
-        self.coord_embed = FourierCoordEmbedder(
-            d_model=d_model,
-            n_freqs=n_freqs,
-            mode=coord_embed_mode,
-            rff_dim=coord_rff_dim,
-            rff_sigma=coord_rff_sigma,
-        )
+        # self.coord_embed = FourierCoordEmbedder(
+        #     d_model=d_model,
+        #     n_freqs=n_freqs,
+        #     mode=coord_embed_mode,
+        #     rff_dim=coord_rff_dim,
+        #     rff_sigma=coord_rff_sigma,
+        # )
         self.lattice_embed = LatticeEmbedder(
             d_model=d_model,
             mode=lattice_embed_mode,
@@ -93,7 +93,7 @@ class CrystaliteModel(nn.Module):
             lattice_repr=lattice_repr,
             dist_slope_init=dist_slope_init,
             use_noise_gate=use_noise_gate,
-            gem_per_layer=gem_per_layer,
+            # gem_per_layer=gem_per_layer,
         )
         self.heads = CrystalHeads(
             d_model=d_model,
@@ -122,7 +122,7 @@ class CrystaliteModel(nn.Module):
                 geometry-aware attention bias. If None, lattice_feats is used.
         """
         frac_mod = mod1(frac_coords)
-        h_type = self.type_proj(type_feats) + self.coord_embed(frac_mod) + self.segment_embed.weight[0]
+        h_type = self.type_proj(type_feats)  + self.segment_embed.weight[0]  #+ self.coord_embed(frac_mod)
         h_lat = self.lattice_embed(lattice_feats) + self.segment_embed.weight[1]
         h_lat = h_lat[:, None, :]
 

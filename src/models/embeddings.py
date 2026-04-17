@@ -38,61 +38,61 @@ class TimeEmbedder(nn.Module):
         return self.mlp(t)
 
 
-class FourierCoordEmbedder(nn.Module):
-    def __init__(
-        self,
-        d_model: int,
-        n_freqs: int = 32,
-        mode: str = "rff",
-        rff_dim: int | None = None,
-        rff_sigma: float = 1.0,
-    ) -> None:
-        """
-        Coordinate embedder with switchable deterministic Fourier or Random Fourier Features (RFF).
+# class FourierCoordEmbedder(nn.Module):
+#     def __init__(
+#         self,
+#         d_model: int,
+#         n_freqs: int = 32,
+#         mode: str = "rff",
+#         rff_dim: int | None = None,
+#         rff_sigma: float = 1.0,
+#     ) -> None:
+#         """
+#         Coordinate embedder with switchable deterministic Fourier or Random Fourier Features (RFF).
 
-        Args:
-            d_model: output embedding dimension.
-            n_freqs: number of deterministic frequencies (when mode="fourier").
-            mode: "fourier" (deterministic 1..n_freqs) or "rff" (random Fourier features).
-            rff_dim: number of random frequency samples; defaults to n_freqs when None.
-            rff_sigma: stddev of the random projection matrix for RFF.
-        """
-        super().__init__()
-        self.mode = mode.lower()
+#         Args:
+#             d_model: output embedding dimension.
+#             n_freqs: number of deterministic frequencies (when mode="fourier").
+#             mode: "fourier" (deterministic 1..n_freqs) or "rff" (random Fourier features).
+#             rff_dim: number of random frequency samples; defaults to n_freqs when None.
+#             rff_sigma: stddev of the random projection matrix for RFF.
+#         """
+#         super().__init__()
+#         self.mode = mode.lower()
 
-        if self.mode not in {"fourier", "rff"}:
-            raise ValueError(f"Unsupported coord embed mode: {mode}")
+#         if self.mode not in {"fourier", "rff"}:
+#             raise ValueError(f"Unsupported coord embed mode: {mode}")
 
-        if self.mode == "fourier":
-            self.n_freqs = n_freqs
-            self.register_buffer("freqs", torch.arange(1, n_freqs + 1, dtype=torch.float32))
-            in_dim = 6 * n_freqs  # 3 axes, sin+cos
-        else:
-            self.n_rff = int(rff_dim) if rff_dim is not None else int(n_freqs)
-            # Fixed random projection matrix; not trainable but stored as buffer for checkpointing.
-            self.register_buffer("proj", torch.randn(3, self.n_rff) * float(rff_sigma))
-            in_dim = 2 * self.n_rff  # sin+cos on projected coords
+#         if self.mode == "fourier":
+#             self.n_freqs = n_freqs
+#             self.register_buffer("freqs", torch.arange(1, n_freqs + 1, dtype=torch.float32))
+#             in_dim = 6 * n_freqs  # 3 axes, sin+cos
+#         else:
+#             self.n_rff = int(rff_dim) if rff_dim is not None else int(n_freqs)
+#             # Fixed random projection matrix; not trainable but stored as buffer for checkpointing.
+#             self.register_buffer("proj", torch.randn(3, self.n_rff) * float(rff_sigma))
+#             in_dim = 2 * self.n_rff  # sin+cos on projected coords
 
-        self.mlp = nn.Sequential(
-            nn.Linear(in_dim, d_model, bias=True),
-            nn.SiLU(),
-            nn.Linear(d_model, d_model, bias=True),
-        )
+#         self.mlp = nn.Sequential(
+#             nn.Linear(in_dim, d_model, bias=True),
+#             nn.SiLU(),
+#             nn.Linear(d_model, d_model, bias=True),
+#         )
 
-    def forward(self, frac_coords: torch.Tensor) -> torch.Tensor:
-        # frac_coords: (B, N, 3), expected in [0,1)
-        if self.mode == "fourier":
-            args = 2 * math.pi * frac_coords[..., None] * self.freqs[None, None, None, :]
-            sin = torch.sin(args)
-            cos = torch.cos(args)
-            feats = torch.cat([sin, cos], dim=-1)
-            feats = feats.reshape(frac_coords.shape[0], frac_coords.shape[1], -1)
-        else:
-            # Project coords with fixed random matrix then apply sinusoidal RFF.
-            proj = frac_coords @ self.proj  # (B, N, n_rff)
-            args = 2 * math.pi * proj
-            feats = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
-        return self.mlp(feats)
+#     def forward(self, frac_coords: torch.Tensor) -> torch.Tensor:
+#         # frac_coords: (B, N, 3), expected in [0,1)
+#         if self.mode == "fourier":
+#             args = 2 * math.pi * frac_coords[..., None] * self.freqs[None, None, None, :]
+#             sin = torch.sin(args)
+#             cos = torch.cos(args)
+#             feats = torch.cat([sin, cos], dim=-1)
+#             feats = feats.reshape(frac_coords.shape[0], frac_coords.shape[1], -1)
+#         else:
+#             # Project coords with fixed random matrix then apply sinusoidal RFF.
+#             proj = frac_coords @ self.proj  # (B, N, n_rff)
+#             args = 2 * math.pi * proj
+#             feats = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
+#         return self.mlp(feats)
 
 
 class LatticeEmbedder(nn.Module):
@@ -165,13 +165,13 @@ class TokenEmbedder(nn.Module):
         super().__init__()
         # PAD=0, elements=1..vz, MASK=vz+1
         self.type_embed = nn.Embedding(vz + 2, d_model, padding_idx=0)
-        self.coord_embed = FourierCoordEmbedder(
-            d_model=d_model,
-            n_freqs=n_freqs,
-            mode=coord_embed_mode,
-            rff_dim=coord_rff_dim,
-            rff_sigma=coord_rff_sigma,
-        )
+        # self.coord_embed = FourierCoordEmbedder(
+        #     d_model=d_model,
+        #     n_freqs=n_freqs,
+        #     mode=coord_embed_mode,
+        #     rff_dim=coord_rff_dim,
+        #     rff_sigma=coord_rff_sigma,
+        # )
         self.lattice_embed = LatticeEmbedder(
             d_model=d_model,
             mode=lattice_embed_mode,
@@ -185,7 +185,7 @@ class TokenEmbedder(nn.Module):
     def forward(
         self,
         a_t: torch.Tensor,
-        f_t: torch.Tensor,
+        # f_t: torch.Tensor,
         y_t: torch.Tensor,
         m_a: torch.Tensor,
         m_f: torch.Tensor,
@@ -193,7 +193,7 @@ class TokenEmbedder(nn.Module):
         pad_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # Atom tokens
-        h_a = self.type_embed(a_t) + self.coord_embed(f_t)
+        h_a = self.type_embed(a_t) #+ self.coord_embed(f_t)
         mask_atom = torch.stack([m_a, m_f], dim=-1)
         h_a = h_a + self.mask_embed_atom(mask_atom) + self.segment_embed.weight[0]
 

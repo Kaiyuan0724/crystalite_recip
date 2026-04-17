@@ -1,3 +1,7 @@
+"""
+GEM 模块开关：--use_distance_bias, --use_edge_bias
+"""
+
 from __future__ import annotations
 
 import os

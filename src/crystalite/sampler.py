@@ -3,7 +3,8 @@ import math
 import torch
 
 from src.crystalite.edm_utils import karras_sigma_steps, denoise_edm
-from src.crystalite.crystalite import CrystaliteModel
+# from src.crystalite.crystalite import CrystaliteModel
+from src.crystalite.recipdit import RecipModel as CrystaliteModel
 
 
 def wrap_frac(delta: torch.Tensor) -> torch.Tensor:

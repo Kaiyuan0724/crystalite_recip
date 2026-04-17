@@ -1,7 +1,8 @@
 import torch
 from contextlib import nullcontext
+from torch import nn
 
-from src.crystalite.crystalite import CrystaliteModel, mod1
+from src.crystalite.crystalite import mod1
 from src.models.lattice_repr import lattice_latent_to_gram, y1_to_loss_features
 
 
@@ -61,7 +62,7 @@ def karras_sigma_steps(
 
 
 def denoise_edm(
-    model: CrystaliteModel,
+    model: nn.Module,
     type_noisy: torch.Tensor,
     frac_noisy: torch.Tensor,
     lat_noisy: torch.Tensor,

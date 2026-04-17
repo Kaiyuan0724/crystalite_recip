@@ -65,7 +65,7 @@ from src.crystalite.edm_utils import (
     denoise_edm,
     compute_edm_loss,
 )
-from src.crystalite import CrystaliteModel, mod1
+from src.crystalite.recipdit import RecipModel as CrystaliteModel
 from src.eval.sample_runtime import (
     SamplingContext,
     SamplingRequest,
@@ -199,32 +199,17 @@ def main() -> None:
     type_encoding = build_type_encoding(args.type_encoding, vz=VZ)
 
     model = CrystaliteModel(
+        vz=VZ,
         d_model=args.d_model,
         n_heads=args.n_heads,
         n_layers=args.n_layers,
-        vz=VZ,
         type_dim=type_encoding.type_dim,
-        n_freqs=args.coord_n_freqs,
-        coord_embed_mode=args.coord_embed_mode,
-        coord_head_mode=args.coord_head_mode,
-        coord_rff_dim=args.coord_rff_dim,
-        coord_rff_sigma=args.coord_rff_sigma,
         lattice_embed_mode=args.lattice_embed_mode,
         lattice_rff_dim=args.lattice_rff_dim,
         lattice_rff_sigma=args.lattice_rff_sigma,
         lattice_repr=args.lattice_repr,
         dropout=args.dropout,
-        attn_dropout=args.attn_dropout,
-        use_distance_bias=args.use_distance_bias,
-        use_edge_bias=args.use_edge_bias,
-        edge_bias_n_freqs=args.edge_bias_n_freqs,
-        edge_bias_hidden_dim=args.edge_bias_hidden_dim,
-        edge_bias_n_rbf=args.edge_bias_n_rbf,
-        edge_bias_rbf_max=args.edge_bias_rbf_max,
-        pbc_radius=args.pbc_radius,
-        dist_slope_init=args.dist_slope_init,
-        use_noise_gate=args.use_noise_gate,
-        gem_per_layer=args.gem_per_layer,
+        coord_head_mode=args.coord_head_mode,
     ).to(device)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"model parameters: {num_params}")
