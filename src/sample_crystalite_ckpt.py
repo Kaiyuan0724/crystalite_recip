@@ -24,7 +24,8 @@ from pymatgen.io.cif import CifWriter
 
 from src.data.mp20_tokens import MP20Tokens, VZ, tokens_to_structure
 from src.models.type_encoding import build_type_encoding
-from src.crystalite import CrystaliteModel, mod1
+# from src.crystalite import CrystaliteModel, mod1
+from src.crystalite.recipdit import RecipModel as CrystaliteModel, mod1
 from src.crystalite.sampler import clamp_lattice_latent as _clamp_lattice_latent, edm_sampler
 from src.models.lattice_repr import lattice_latent_to_y1
 from src.utils.dataset import compute_allowed_elements, ensure_dataset_splits
@@ -104,33 +105,47 @@ def _build_model_from_ckpt(
         )
     type_dim = int(ckpt.get("type_dim", model_args.get("type_dim", VZ + 1)))
 
+    # model = CrystaliteModel(
+    #     d_model=int(model_args.get("d_model", 512)),
+    #     n_heads=int(model_args.get("n_heads", 8)),
+    #     n_layers=int(model_args.get("n_layers", 18)),
+    #     vz=VZ,
+    #     type_dim=type_dim,
+    #     n_freqs=int(model_args.get("coord_n_freqs", model_args.get("n_freqs", 32))),
+    #     coord_embed_mode=str(model_args.get("coord_embed_mode", "fourier")),
+    #     coord_head_mode=str(model_args.get("coord_head_mode", "direct")),
+    #     coord_rff_dim=model_args.get("coord_rff_dim", None),
+    #     coord_rff_sigma=float(model_args.get("coord_rff_sigma", 1.0)),
+    #     lattice_embed_mode=str(model_args.get("lattice_embed_mode", "mlp")),
+    #     lattice_rff_dim=int(model_args.get("lattice_rff_dim", 256)),
+    #     lattice_rff_sigma=float(model_args.get("lattice_rff_sigma", 5.0)),
+    #     lattice_repr=str(model_args.get("lattice_repr", "y1")),
+    #     dropout=float(model_args.get("dropout", 0.0)),
+    #     attn_dropout=float(model_args.get("attn_dropout", 0.0)),
+    #     use_distance_bias=bool(model_args.get("use_distance_bias", False)),
+    #     use_edge_bias=bool(model_args.get("use_edge_bias", False)),
+    #     edge_bias_n_freqs=int(model_args.get("edge_bias_n_freqs", 8)),
+    #     edge_bias_hidden_dim=int(model_args.get("edge_bias_hidden_dim", 128)),
+    #     edge_bias_n_rbf=int(model_args.get("edge_bias_n_rbf", 16)),
+    #     edge_bias_rbf_max=float(model_args.get("edge_bias_rbf_max", 2.0)),
+    #     pbc_radius=int(model_args.get("pbc_radius", 1)),
+    #     dist_slope_init=float(model_args.get("dist_slope_init", -1.0)),
+    #     use_noise_gate=bool(model_args.get("use_noise_gate", True)),
+    #     gem_per_layer=bool(model_args.get("gem_per_layer", False)),
+    # ).to(device)
+
+
     model = CrystaliteModel(
         d_model=int(model_args.get("d_model", 512)),
         n_heads=int(model_args.get("n_heads", 8)),
         n_layers=int(model_args.get("n_layers", 18)),
         vz=VZ,
         type_dim=type_dim,
-        n_freqs=int(model_args.get("coord_n_freqs", model_args.get("n_freqs", 32))),
-        coord_embed_mode=str(model_args.get("coord_embed_mode", "fourier")),
-        coord_head_mode=str(model_args.get("coord_head_mode", "direct")),
-        coord_rff_dim=model_args.get("coord_rff_dim", None),
-        coord_rff_sigma=float(model_args.get("coord_rff_sigma", 1.0)),
-        lattice_embed_mode=str(model_args.get("lattice_embed_mode", "mlp")),
+        lattice_embed_mode=str(model_args.get("lattice_embed_mode", "rff")),
         lattice_rff_dim=int(model_args.get("lattice_rff_dim", 256)),
         lattice_rff_sigma=float(model_args.get("lattice_rff_sigma", 5.0)),
-        lattice_repr=str(model_args.get("lattice_repr", "y1")),
         dropout=float(model_args.get("dropout", 0.0)),
-        attn_dropout=float(model_args.get("attn_dropout", 0.0)),
-        use_distance_bias=bool(model_args.get("use_distance_bias", False)),
-        use_edge_bias=bool(model_args.get("use_edge_bias", False)),
-        edge_bias_n_freqs=int(model_args.get("edge_bias_n_freqs", 8)),
-        edge_bias_hidden_dim=int(model_args.get("edge_bias_hidden_dim", 128)),
-        edge_bias_n_rbf=int(model_args.get("edge_bias_n_rbf", 16)),
-        edge_bias_rbf_max=float(model_args.get("edge_bias_rbf_max", 2.0)),
-        pbc_radius=int(model_args.get("pbc_radius", 1)),
-        dist_slope_init=float(model_args.get("dist_slope_init", -1.0)),
-        use_noise_gate=bool(model_args.get("use_noise_gate", True)),
-        gem_per_layer=bool(model_args.get("gem_per_layer", False)),
+        coord_head_mode=str(model_args.get("coord_head_mode", "direct")),
     ).to(device)
 
     model_state = ckpt.get("model_state_dict", None)
@@ -477,13 +492,15 @@ def main() -> None:
                 generator=generator,
                 autocast_dtype=autocast_dtype,
                 fixed_atom_types=None,
-                skip_type_scaling=False,
+                # skip_type_scaling=False,
+                skip_type_scaling = bool(model_args.get("csp", False))
                 aa_frac_max_scale=aa_frac_max_scale,
                 aa_rho_types=aa_rho_types,
                 aa_rho_coords=aa_rho_coords,
                 aa_rho_lattice=aa_rho_lattice,
                 lattice_repr=lattice_repr,
             )
+
 
             pad_mask_cpu = pad_mask.to("cpu")
             real_mask_cpu = ~pad_mask_cpu

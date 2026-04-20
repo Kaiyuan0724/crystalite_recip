@@ -207,7 +207,6 @@ def main() -> None:
         lattice_embed_mode=args.lattice_embed_mode,
         lattice_rff_dim=args.lattice_rff_dim,
         lattice_rff_sigma=args.lattice_rff_sigma,
-        lattice_repr=args.lattice_repr,
         dropout=args.dropout,
         coord_head_mode=args.coord_head_mode,
     ).to(device)

@@ -2,7 +2,7 @@ import torch
 from contextlib import nullcontext
 from torch import nn
 
-from src.crystalite.crystalite import mod1
+from src.crystalite.recipdit import mod1
 from src.models.lattice_repr import lattice_latent_to_gram, y1_to_loss_features
 
 

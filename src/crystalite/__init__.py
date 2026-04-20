@@ -1,3 +1,3 @@
-from .crystalite import CrystaliteModel, MP20EDMModel, mod1
+from .recipdit import RecipModel as CrystaliteModel, mod1
 
-__all__ = ["CrystaliteModel", "MP20EDMModel", "mod1"]
+__all__ = ["CrystaliteModel", "mod1"]

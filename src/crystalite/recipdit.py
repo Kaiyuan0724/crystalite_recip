@@ -28,7 +28,6 @@ class RecipModel(nn.Module):
             lattice_rff_dim:    int = 256,
             lattice_rff_sigma:  float = 5.0,
             dropout:            float = 0.0,
-            lattice_repr:       str = "y1",
             coord_head_mode:    str = "direct",
             sigma_init:         float = 0.5,
     ) -> None:
@@ -109,6 +108,9 @@ class RecipModel(nn.Module):
         lat_for_rope[:, 0] = lat_for_rope[:, 0].clamp(-10.0, 10.0)
         lat_for_rope[:, 2] = lat_for_rope[:, 2].clamp(-10.0, 10.0)
         lat_for_rope[:, 5] = lat_for_rope[:, 5].clamp(-10.0, 10.0)
+        lat_for_rope[:, 1] = lat_for_rope[:, 1].clamp(-10.0, 10.0)
+        lat_for_rope[:, 3] = lat_for_rope[:, 3].clamp(-10.0, 10.0)
+        lat_for_rope[:, 4] = lat_for_rope[:, 4].clamp(-10.0, 10.0)
 
         # Lattice token is never padding; its False goes at the front.
         pad_seq = torch.cat(
